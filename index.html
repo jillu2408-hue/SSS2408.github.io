@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Conference Room Booking</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:Segoe UI,Arial;
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  min-height:100vh;
+}
+.hidden{display:none}
+
+.container{
+  max-width:900px;
+  margin:40px auto;
+  background:#fff;
+  padding:25px;
+  border-radius:15px;
+  box-shadow:0 15px 40px rgba(0,0,0,.3);
+}
+
+h1,h2{text-align:center}
+
+.navbar{
+  background:#667eea;
+  color:#fff;
+  padding:10px 15px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-radius:10px;
+}
+
+.navbar span{cursor:pointer}
+
+input,select,button{
+  width:100%;
+  padding:10px;
+  margin:8px 0;
+  border-radius:6px;
+  border:1px solid #ccc;
+}
+
+button{
+  background:#667eea;
+  color:#fff;
+  font-weight:bold;
+  border:none;
+  cursor:pointer;
+}
+
+button:hover{background:#5a67d8}
+</style>
+</head>
+
+<body>
+
+<!-- HOME -->
+<div class="container" id="home">
+<h1>🏢 Conference Room Booking</h1>
+<p style="text-align:center">Easy • Secure • Conflict-Free</p>
+<button onclick="showLogin()">Get Started</button>
+</div>
+
+<!-- LOGIN -->
+<div class="container hidden" id="login">
+<h2>Login</h2>
+<input id="password" type="password" placeholder="Password (pass123)">
+<button onclick="loginUser()">Login</button>
+
+</div>
+
+<!-- BOOKING -->
+<div class="container hidden" id="booking">
+<div class="navbar">
+<span onclick="goBack()">⬅ Back</span>
+<b>Room Booking</b>
+<span></span>
+</div>
+
+<select id="room" onchange="loadStartSlots()">
+<option>FTL Conference Room</option>
+<option>SEL Conference Room</option>
+</select>
+
+<input type="date" id="date" onchange="loadStartSlots()">
+
+<label>Start Time</label>
+<select id="start" onchange="loadEndSlots()"></select>
+
+<label>End Time</label>
+<select id="end"></select>
+
+<input id="username" placeholder="User Name">
+<input id="mobile" placeholder="Mobile Number">
+
+<select id="purpose">
+<option>Meeting</option>
+<option>Training</option>
+<option>Interview</option>
+<option>Client</option>
+</select>
+
+<button onclick="bookRoom()">Submit</button>
+</div>
+
+<!-- ADMIN -->
+<div class="container hidden" id="admin">
+<div class="navbar">
+<span onclick="goBack()">⬅ Back</span>
+<b>Admin Dashboard</b>
+<span></span>
+</div>
+
+<button onclick="exportExcel()">Export Excel</button>
+
+<table border="1" width="100%" style="margin-top:15px">
+<thead>
+<tr>
+<th>Room</th><th>Name</th><th>Mobile</th>
+<th>Date</th><th>Start</th><th>End</th><th>Purpose</th>
+</tr>
+</thead>
+<tbody id="table"></tbody>
+</table>
+</div>
+
+<script>
+/* ELEMENT REFERENCES */
+const home = document.getElementById("home");
+const login = document.getElementById("login");
+const booking = document.getElementById("booking");
+const admin = document.getElementById("admin");
+
+const passwordInput = document.getElementById("password");
+const room = document.getElementById("room");
+const dateInput = document.getElementById("date");
+const start = document.getElementById("start");
+const end = document.getElementById("end");
+
+const username = document.getElementById("username");
+const mobile = document.getElementById("mobile");
+const purpose = document.getElementById("purpose");
+const table = document.getElementById("table");
+
+const bookings = JSON.parse(localStorage.getItem("bookings") || "[]");
+
+/* NAVIGATION */
+function showLogin(){
+  home.classList.add("hidden");
+  login.classList.remove("hidden");
+}
+
+function loginUser(){
+  if(passwordInput.value !== "pass123"){
+    alert("Wrong password");
+    return;
+  }
+  login.classList.add("hidden");
+  booking.classList.remove("hidden");
+}
+
+function goBack(){
+  booking.classList.add("hidden");
+  admin.classList.add("hidden");
+  login.classList.remove("hidden");
+}
+
+/* TIME SLOT LOGIC */
+function generateSlots(){
+  const slots=[];
+  let h=9,m=0;
+  while(h<18){
+    slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    m+=15;
+    if(m===60){h++;m=0}
+  }
+  return slots;
+}
+
+function loadStartSlots(){
+  start.innerHTML="";
+  end.innerHTML="";
+  if(!dateInput.value) return;
+
+  generateSlots().forEach(t=>{
+    const disabled = bookings.some(b =>
+      b.room===room.value &&
+      b.date===dateInput.value &&
+      t>=b.start && t<b.end
+    );
+    const opt=new Option(t,t);
+    opt.disabled=disabled;
+    start.add(opt);
+  });
+}
+
+function loadEndSlots(){
+  end.innerHTML="";
+  const slots=generateSlots();
+  const index=slots.indexOf(start.value);
+
+  slots.slice(index+1).forEach(t=>{
+    const disabled = bookings.some(b =>
+      b.room===room.value &&
+      b.date===dateInput.value &&
+      !(t<=b.start || start.value>=b.end)
+    );
+    const opt=new Option(t,t);
+    opt.disabled=disabled;
+    end.add(opt);
+  });
+}
+
+/* BOOK ROOM */
+function bookRoom(){
+  bookings.push({
+    room:room.value,
+    name:username.value,
+    mobile:mobile.value,
+    date:dateInput.value,
+    start:start.value,
+    end:end.value,
+    purpose:purpose.value
+  });
+
+  localStorage.setItem("bookings",JSON.stringify(bookings));
+  alert("Booking successful");
+
+  booking.classList.add("hidden");
+  admin.classList.remove("hidden");
+  loadAdmin();
+}
+
+/* ADMIN VIEW */
+function loadAdmin(){
+  table.innerHTML="";
+  bookings.forEach(b=>{
+    table.innerHTML+=`
+    <tr>
+      <td>${b.room}</td>
+      <td>${b.name}</td>
+      <td>${b.mobile}</td>
+      <td>${b.date}</td>
+      <td>${b.start}</td>
+      <td>${b.end}</td>
+      <td>${b.purpose}</td>
+    </tr>`;
+  });
+}
+
+/* EXPORT */
+function exportExcel(){
+  const ws=XLSX.utils.json_to_sheet(bookings);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Bookings");
+  XLSX.writeFile(wb,"ConferenceBookings.xlsx");
+}
+</script>
+
+</body>
+</html>
